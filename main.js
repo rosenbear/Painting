@@ -1090,63 +1090,75 @@ document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: fa
   }
 
   // ======== RENDER LOOP ========
-  function resizeViewCanvas() {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = view.getBoundingClientRect();
-    view.width = Math.floor(rect.width * dpr);
-    view.height = Math.floor(rect.height * dpr);
-    viewCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    viewCtx.imageSmoothingEnabled = false;
+  let DPR = 1;
 
-    // Initialize view transform to center the main canvas
-    // (do once unless user already panned/zoomed)
-    if (!resizeViewCanvas._initialized) {
-      resizeViewCanvas._initialized = true;
-      viewState.scale = 0.6; // initial view
-      const cx = rect.width * 0.5;
-      const cy = rect.height * 0.5;
-      viewState.offsetX = cx - (MAIN_W * viewState.scale) * 0.5;
-      viewState.offsetY = cy - (MAIN_H * viewState.scale) * 0.5;
-    }
+function resizeViewCanvas() {
+  DPR = window.devicePixelRatio || 1;
+  const rect = view.getBoundingClientRect();
+
+  // Backing store in device pixels
+  view.width = Math.floor(rect.width * DPR);
+  view.height = Math.floor(rect.height * DPR);
+
+  // Always draw in CSS pixels by setting DPR transform
+  viewCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  viewCtx.imageSmoothingEnabled = false;
+
+  // Initialize view transform to center the main canvas (once)
+  if (!resizeViewCanvas._initialized) {
+    resizeViewCanvas._initialized = true;
+
+    viewState.scale = 0.6; // initial zoom
+    const cx = rect.width * 0.5;
+    const cy = rect.height * 0.5;
+    viewState.offsetX = cx - (MAIN_W * viewState.scale) * 0.5;
+    viewState.offsetY = cy - (MAIN_H * viewState.scale) * 0.5;
   }
+}
+
 
   function render() {
-    updateSliderLabels();
-    sizeSlider.updateUI();
-    spaceSlider.updateUI();
+  updateSliderLabels();
+  sizeSlider.updateUI();
+  spaceSlider.updateUI();
 
-    const rect = view.getBoundingClientRect();
-    viewCtx.setTransform(1, 0, 0, 1, 0, 0);
-    viewCtx.clearRect(0, 0, rect.width, rect.height);
+  const rect = view.getBoundingClientRect();
 
-    // Background
-    viewCtx.fillStyle = "#111";
-    viewCtx.fillRect(0, 0, rect.width, rect.height);
+  // IMPORTANT: draw in CSS pixel coordinates using DPR transform
+  viewCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  viewCtx.imageSmoothingEnabled = false;
 
-    // Apply view transform
-    viewCtx.save();
-    viewCtx.translate(viewState.offsetX, viewState.offsetY);
-    viewCtx.scale(viewState.scale, viewState.scale);
+  // Clear in CSS pixels (not device pixels)
+  viewCtx.clearRect(0, 0, rect.width, rect.height);
 
-    // Canvas background (white)
-    viewCtx.fillStyle = "#ffffff";
-    viewCtx.fillRect(0, 0, MAIN_W, MAIN_H);
+  // Background
+  viewCtx.fillStyle = "#111";
+  viewCtx.fillRect(0, 0, rect.width, rect.height);
 
-    // Composite layers
-    viewCtx.imageSmoothingEnabled = false;
-    for (let i = 0; i < LAYER_COUNT; i++) {
-      viewCtx.drawImage(layers[i].canvas, 0, 0);
-    }
+  // Apply view transform (still in CSS pixels)
+  viewCtx.save();
+  viewCtx.translate(viewState.offsetX, viewState.offsetY);
+  viewCtx.scale(viewState.scale, viewState.scale);
 
-    // Border
-    viewCtx.strokeStyle = "rgba(0,0,0,0.25)";
-    viewCtx.lineWidth = 4 / viewState.scale;
-    viewCtx.strokeRect(0, 0, MAIN_W, MAIN_H);
+  // Canvas background (white)
+  viewCtx.fillStyle = "#ffffff";
+  viewCtx.fillRect(0, 0, MAIN_W, MAIN_H);
 
-    viewCtx.restore();
-
-    requestAnimationFrame(render);
+  // Composite layers
+  for (let i = 0; i < LAYER_COUNT; i++) {
+    viewCtx.drawImage(layers[i].canvas, 0, 0);
   }
+
+  // Border (keep crisp)
+  viewCtx.strokeStyle = "rgba(0,0,0,0.25)";
+  viewCtx.lineWidth = 4 / viewState.scale;
+  viewCtx.strokeRect(0, 0, MAIN_W, MAIN_H);
+
+  viewCtx.restore();
+
+  requestAnimationFrame(render);
+}
+
 
   // ======== INIT ========
   function init() {
