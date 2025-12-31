@@ -1,5 +1,11 @@
 // main.js
 (() => {
+
+  // iPad Safari: prevent native pinch/zoom gestures from stealing events
+document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
+
   // ======== CONFIG ========
   // Pick a fixed iPad Pro-ish landscape canvas size. Change here if desired.
   const MAIN_W = 2732;
