@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brush Studio App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            overscroll-behavior: none;
+            touch-action: none;
+        }
+        .canvas-bg {
+            background-color: #ffffff; 
+        }
+        .studio-canvas-container {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            cursor: crosshair;
+        }
+        /* Custom scrollbar for the sidebar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            margin-top: -6px;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 2px;
+        }
+        .swatch {
+            transition: transform 0.1s, border-color 0.1s;
+        }
+        .swatch.active {
+            transform: scale(1.1);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+        /* Shape Control Panel Animation */
+        .fade-in-up {
+            animation: fadeInUp 0.3s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translate(-50%, 20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .sidebar-active {
+            border-color: #3b82f6 !important;
+            box-shadow: inset 0 0 0 2px #3b82f6;
+        }
+        /* Checkbox styling */
+        .flux-checkbox {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            accent-color: #9333ea;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen w-screen flex overflow-hidden font-sans text-gray-800">
+
+    <!-- LEFT SIDEBAR: Standard Studio -->
+    <div id="sidebar-left" class="w-96 flex-shrink-0 bg-white shadow-lg flex flex-col h-full z-10 border-r-4 border-transparent transition-colors duration-200 sidebar-active">
+        <!-- Header (Fixed) -->
+        <div class="p-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+            <h1 class="text-xl font-bold text-gray-800 mb-1"><i class="fas fa-paint-brush mr-2 text-blue-500"></i>Brush Studio</h1>
+            <p class="text-xs text-gray-500">Standard Collection</p>
+        </div>
+
+        <!-- Unified Scrollable Area -->
+        <div class="flex-1 overflow-y-auto">
+            <!-- Main Controls -->
+            <div class="p-4 grid grid-cols-2 gap-2 border-b border-gray-200 bg-white">
+                <button id="btn-brush" class="flex items-center justify-center py-2 px-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition active-tool" onclick="setTool('brush')">
+                    <i class="fas fa-pen mr-2"></i> Brush
+                </button>
+                <button id="btn-eraser" class="flex items-center justify-center py-2 px-3 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition" onclick="setTool('eraser')">
+                    <i class="fas fa-eraser mr-2"></i> Eraser
+                </button>
+                
+                <!-- Shape Button -->
+                <button id="btn-shape" class="col-span-2 flex items-center justify-center py-2 px-3 bg-purple-100 text-purple-700 border border-purple-200 rounded hover:bg-purple-200 transition mt-1" onclick="setTool('shape')">
+                    <i class="fas fa-shapes mr-2"></i> Shape Fill Mode
+                </button>
+
+                <div class="col-span-2 mt-2">
+                    <label class="text-xs font-bold text-gray-500 uppercase">Brush Size: <span id="size-display">40</span>px</label>
+                    <input type="range" id="main-brush-size" min="5" max="150" value="40" class="w-full mt-1 appearance-none bg-transparent">
+                </div>
+
+                <div class="col-span-2 mt-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase">Spacing: <span id="spacing-display">5</span>%</label>
+                    <input type="range" id="brush-spacing" min="2" max="25" value="5" class="w-full mt-1 appearance-none bg-transparent">
+                </div>
+
+                <div class="col-span-2 mt-1">
+                    <label class="text-xs font-bold text-gray-500 uppercase">Flow: <span id="flow-display">0</span> stamps/sec</label>
+                    <input type="range" id="brush-flow" min="0" max="200" step="0.1" value="0" class="w-full mt-1 appearance-none bg-transparent">
+                </div>
+
+                <!-- Studio Pen Size Slider -->
+                <div class="col-span-2 mt-2 pt-2 border-t border-gray-200">
+                    <label class="text-xs font-bold text-gray-400 uppercase">Studio Pen Size: <span id="studio-size-display">15</span>px</label>
+                    <input type="range" id="studio-brush-size" min="2" max="50" value="15" class="w-full mt-1 appearance-none bg-transparent">
+                </div>
+
+                <!-- Rotation & Pivot Controls -->
+                <div class="col-span-2 mt-2 pt-2 border-t border-gray-200">
+                    <label class="text-xs font-bold text-gray-400 uppercase">Rotation Jitter: <span id="jitter-display">0</span>°</label>
+                    <input type="range" id="rotation-jitter" min="0" max="360" value="0" class="w-full mt-1 appearance-none bg-transparent">
+                    
+                    <div class="flex gap-2 mt-2">
+                        <div class="flex-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Pivot X: <span id="pivot-x-display">50</span>%</label>
+                            <input type="range" id="pivot-x" min="0" max="100" value="50" class="w-full mt-1 appearance-none bg-transparent">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Pivot Y: <span id="pivot-y-display">50</span>%</label>
+                            <input type="range" id="pivot-y" min="0" max="100" value="50" class="w-full mt-1 appearance-none bg-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="undo()" class="col-span-2 mt-2 flex items-center justify-center py-2 px-3 bg-gray-100 border border-gray-300 text-gray-700 rounded hover:bg-gray-200 transition">
+                    <i class="fas fa-undo mr-2"></i> Undo
+                </button>
+                <button onclick="clearAll()" class="col-span-2 mt-1 flex items-center justify-center py-1 px-3 text-red-500 text-sm hover:text-red-700 transition">
+                    <i class="fas fa-trash-alt mr-2"></i> Clear Canvas
+                </button>
+            </div>
+
+            <!-- Studios List -->
+            <div class="p-4 bg-gray-50 min-h-0">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-bold text-gray-600 uppercase">Active Studios (<span id="studio-count">1</span>/5)</h2>
+                </div>
+                
+                <div id="studios-container" class="grid grid-cols-2 gap-2">
+                    <!-- Studio items will be injected here -->
+                </div>
+                
+                <button id="add-studio-btn" onclick="addStudio()" class="w-full mt-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-blue-400 hover:text-blue-500 transition flex items-center justify-center">
+                    <i class="fas fa-plus mr-2"></i> Add Brush Studio
+                </button>
+                
+                <div class="h-8"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CENTER: Main Canvas Area -->
+    <div class="flex-1 relative bg-gray-200 h-full flex flex-col z-0">
+        <div class="absolute inset-4 bg-white shadow-sm rounded-lg overflow-hidden cursor-crosshair canvas-bg" id="canvas-wrapper">
+            
+            <canvas id="main-canvas"></canvas>
+
+            <!-- Value Swatches UI -->
+            <div class="absolute top-4 left-4 flex flex-col gap-2 p-2 bg-white/90 backdrop-blur rounded-lg shadow border border-gray-200 z-20">
+                <div class="text-[10px] font-bold text-gray-400 uppercase text-center mb-1">Values</div>
+                <div class="flex gap-2">
+                    <div class="relative group">
+                        <div id="swatch-0" class="swatch w-10 h-10 rounded border-2 border-gray-300 shadow cursor-pointer" onclick="openValueSlider(0)"></div>
+                        <span class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-500 font-bold">BG</span>
+                    </div>
+                    <div class="w-px bg-gray-300 mx-1"></div>
+                    <div class="relative group">
+                        <div id="swatch-1" class="swatch w-10 h-10 rounded border-2 border-white shadow cursor-pointer active" onclick="openValueSlider(1)"></div>
+                        <span class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-500 font-bold">1</span>
+                    </div>
+                    <div class="relative group">
+                        <div id="swatch-2" class="swatch w-10 h-10 rounded border-2 border-white shadow cursor-pointer" onclick="openValueSlider(2)"></div>
+                        <span class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-500 font-bold">2</span>
+                    </div>
+                    <div class="relative group">
+                        <div id="swatch-3" class="swatch w-10 h-10 rounded border-2 border-white shadow cursor-pointer" onclick="openValueSlider(3)"></div>
+                        <span class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] text-gray-500 font-bold">3</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shape Control Overlay (Hidden initially) -->
+            <div id="shape-controls" class="hidden absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-4 py-3 rounded-xl shadow-2xl border border-gray-200 z-30 flex items-center gap-3 fade-in-up">
+                <div class="text-xs font-bold text-gray-500 mr-2 border-r border-gray-200 pr-3">
+                    SHAPE<br>MODE
+                </div>
+                
+                <button id="btn-populate" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 font-bold text-sm" onclick="populateShape()">
+                    <i class="fas fa-magic mr-2"></i> Populate
+                </button>
+
+                <div id="populate-options" class="hidden flex gap-2">
+                    <button class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm" onclick="populateShape(false)" title="Restamp (Clear & Retry)">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm" onclick="populateShape(true)" title="Add Another Pass">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm font-semibold w-32" onclick="nextShapeMode()">
+                        <i class="fas fa-random mr-1"></i> <span id="shape-mode-label">Clusters</span>
+                    </button>
+                    <button class="px-3 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600 text-sm font-bold" onclick="confirmShape()">
+                        <i class="fas fa-check mr-1"></i> Confirm
+                    </button>
+                </div>
+
+                <button class="px-3 py-2 text-red-400 hover:text-red-600 text-sm ml-2" onclick="cancelShape()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Value Adjustment Slider Popup -->
+            <div id="value-slider-popup" class="hidden absolute top-24 left-4 p-3 bg-white shadow-xl rounded-lg border border-gray-200 z-30 w-48">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-gray-600">Adjust Value <span id="popup-swatch-id">#1</span></span>
+                    <button onclick="closeValueSlider()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                </div>
+                <input type="range" id="popup-slider" min="0" max="255" class="w-full">
+            </div>
+
+        </div>
+        <div class="absolute bottom-6 right-6 bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow text-xs text-gray-500 pointer-events-none">
+            Canvas Active
+        </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR: Experimental Studio -->
+    <div id="sidebar-right" class="w-80 flex-shrink-0 bg-white shadow-lg flex flex-col h-full z-10 border-l-4 border-transparent transition-colors duration-200">
+        <div class="p-4 border-b border-gray-200 bg-purple-50 flex-shrink-0">
+            <h1 class="text-xl font-bold text-gray-800 mb-1"><i class="fas fa-flask mr-2 text-purple-500"></i>Experimental</h1>
+            <p class="text-xs text-gray-500">Multi-stroke Composite Brush</p>
+        </div>
+
+        <div class="p-4 flex-1 overflow-y-auto">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-xs font-bold text-gray-400 uppercase">Single Studio Canvas</h2>
+                <button onclick="clearExperimental()" class="text-xs text-red-400 hover:text-red-600 font-bold"><i class="fas fa-trash-alt mr-1"></i> Clear</button>
+            </div>
+
+            <!-- Experimental Canvas -->
+            <div class="relative w-full aspect-square mb-4 studio-canvas-container rounded-lg overflow-hidden shadow-inner bg-white border-2 border-purple-100">
+                <canvas id="exp-canvas" class="absolute inset-0 w-full h-full"></canvas>
+                <div id="exp-hint" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-purple-200 text-sm italic p-4 text-center">
+                    <span>Draw multiple strokes here</span>
+                    <span id="exp-stroke-count" class="text-xs mt-1 font-bold text-purple-300">0/10</span>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                
+                <!-- Brush Mode Controls -->
+                <div class="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                    <h3 class="text-xs font-bold text-purple-800 mb-2 border-b border-purple-200 pb-1">Brush Behavior</h3>
+                    
+                    <div class="mb-3">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Mode</label>
+                        <div class="flex bg-gray-200 rounded p-1 mt-1">
+                            <button id="mode-composite" class="flex-1 py-1 text-[10px] font-bold rounded bg-white shadow text-purple-700 transition" onclick="setExpMode('composite')">Stack</button>
+                            <button id="mode-variation" class="flex-1 py-1 text-[10px] font-bold rounded text-gray-500 hover:bg-gray-100 transition" onclick="setExpMode('variation')">Variations</button>
+                        </div>
+                        <p id="mode-desc" class="text-[9px] text-gray-400 mt-1 italic">Stamps all strokes together as one.</p>
+                    </div>
+
+                    <div id="variation-controls" class="hidden">
+                        <div class="flex justify-between items-center">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">Variation Chance: <span id="exp-var-display">0</span>%</label>
+                            <div class="flex items-center gap-1">
+                                <input type="checkbox" id="exp-flux" class="flux-checkbox">
+                                <label for="exp-flux" class="text-[10px] font-bold text-purple-500 cursor-pointer">Flux</label>
+                            </div>
+                        </div>
+                        <input type="range" id="exp-variation" min="0" max="100" value="0" class="w-full mt-1 appearance-none bg-transparent">
+                        <p class="text-[9px] text-gray-400 mt-1 italic">Chance to swap Main stroke (1st) with others. Flux adds randomness to this chance over time.</p>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                    <h3 class="text-xs font-bold text-purple-800 mb-2 border-b border-purple-200 pb-1">Internal Jitter</h3>
+                    
+                    <div class="mb-3">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Scatter (Pos): <span id="exp-scatter-display">0</span>px</label>
+                        <input type="range" id="exp-scatter" min="0" max="50" value="0" class="w-full mt-1 appearance-none bg-transparent">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Rotate (Indiv): <span id="exp-rotate-display">0</span>°</label>
+                        <input type="range" id="exp-rotate" min="0" max="360" value="0" class="w-full mt-1 appearance-none bg-transparent">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template for a Studio Card (Hidden) -->
+    <template id="studio-template">
+        <div class="studio-card bg-white p-2 rounded-lg shadow-sm border border-gray-200 relative group transition-all duration-200 hover:shadow-md">
+            <div class="flex justify-between items-start mb-1">
+                <span class="text-[10px] font-bold text-gray-500 studio-label uppercase tracking-wider">Studio #1</span>
+                <div class="flex gap-1">
+                    <button class="clear-studio-btn text-gray-400 hover:text-red-500 p-0.5" title="Clear Studio">
+                        <i class="fas fa-trash-alt text-[10px]"></i>
+                    </button>
+                    <button class="remove-studio-btn text-gray-300 hover:text-red-500 p-0.5 hidden" title="Remove Studio">
+                        <i class="fas fa-times text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="relative w-full aspect-square mb-2 studio-canvas-container rounded overflow-hidden">
+                <canvas class="studio-canvas absolute inset-0 w-full h-full"></canvas>
+                <div class="pointer-events-none absolute inset-0 flex items-center justify-center text-gray-300 text-[10px] italic empty-hint">Draw</div>
+            </div>
+            <div>
+                <div class="flex justify-between text-[10px] text-gray-500 mb-0.5">
+                    <span>Prob.</span>
+                    <span class="prob-display">100%</span>
+                </div>
+                <input type="range" class="prob-slider w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="0" max="100" value="50">
+            </div>
+            <button class="add-linked-btn absolute -right-2 top-1/2 transform -translate-y-1/2 w-5 h-5 bg-blue-500 text-white rounded-full shadow hover:bg-blue-600 flex items-center justify-center z-10 hidden border-2 border-white" title="Open another Studio">
+                <i class="fas fa-plus text-[10px]"></i>
+            </button>
+        </div>
+    </template>
+
+    <script>
+        // --- State Management ---
+        const state = {
+            tool: 'brush', 
+            brushSource: 'standard', // 'standard' or 'experimental'
+            isDrawingMain: false,
+            mainBrushSize: 40,
+            studioBrushSize: 15, 
+            brushSpacing: 5, 
+            flowRate: 0, 
+            flowInterval: null,
+            rotationJitter: 0, // Global
+            pivotX: 0.5, 
+            pivotY: 0.5,
+            
+            // Experimental Settings
+            expStrokes: [], // Array of canvases
+            expMode: 'composite', // 'composite' or 'variation'
+            expVariation: 0, // 0-100% chance (Slider value)
+            expFlux: false, // Is Flux enabled?
+            expScatter: 0,
+            expRotate: 0,
+            
+            // Flux State
+            activeVariationChance: 0, // The actual value used (either static or fluxed)
+            fluxCounter: 0,
+            fluxLimit: 10,
+
+            studios: [], 
+            history: [],
+            historyStep: -1,
+            maxStudios: 6,
+            backgroundValue: 255, 
+            values: { 1: 30, 2: 128, 3: 220 },
+            activeValueIndex: 1, 
+            editingValueIndex: null,
+            // Shape Mode State
+            shapePath: [], 
+            shapeModeStep: 'none', 
+            fillAlgorithm: 0, 
+            fillAlgorithms: ['Clusters', 'Golden Spiral', 'Veins']
+        };
+
+        // --- DOM Elements ---
+        const mainCanvas = document.getElementById('main-canvas');
+        const mainCtx = mainCanvas.getContext('2d', { willReadFrequently: true });
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const studiosContainer = document.getElementById('studios-container');
+        const studioTemplate = document.getElementById('studio-template');
+        
+        // Sidebars
+        const sidebarLeft = document.getElementById('sidebar-left');
+        const sidebarRight = document.getElementById('sidebar-right');
+
+        // Experimental DOM
+        const expCanvas = document.getElementById('exp-canvas');
+        const expCtx = expCanvas.getContext('2d', { willReadFrequently: true });
+        const expHint = document.getElementById('exp-hint');
+        const expStrokeCount = document.getElementById('exp-stroke-count');
+        const expScatterSlider = document.getElementById('exp-scatter');
+        const expRotateSlider = document.getElementById('exp-rotate');
+        const expScatterDisplay = document.getElementById('exp-scatter-display');
+        const expRotateDisplay = document.getElementById('exp-rotate-display');
+        
+        const modeCompositeBtn = document.getElementById('mode-composite');
+        const modeVariationBtn = document.getElementById('mode-variation');
+        const modeDesc = document.getElementById('mode-desc');
+        const variationControls = document.getElementById('variation-controls');
+        const expVariationSlider = document.getElementById('exp-variation');
+        const expVarDisplay = document.getElementById('exp-var-display');
+        const expFluxCheckbox = document.getElementById('exp-flux');
+
+        // ... existing controls ...
+        const addStudioMainBtn = document.getElementById('add-studio-btn');
+        const sizeDisplay = document.getElementById('size-display');
+        const sizeSlider = document.getElementById('main-brush-size');
+        const studioSizeDisplay = document.getElementById('studio-size-display');
+        const studioSizeSlider = document.getElementById('studio-brush-size');
+        const spacingDisplay = document.getElementById('spacing-display');
+        const spacingSlider = document.getElementById('brush-spacing');
+        const flowDisplay = document.getElementById('flow-display');
+        const flowSlider = document.getElementById('brush-flow');
+        const jitterDisplay = document.getElementById('jitter-display');
+        const jitterSlider = document.getElementById('rotation-jitter');
+        const pivotXDisplay = document.getElementById('pivot-x-display');
+        const pivotXSlider = document.getElementById('pivot-x');
+        const pivotYDisplay = document.getElementById('pivot-y-display');
+        const pivotYSlider = document.getElementById('pivot-y');
+        const popupSlider = document.getElementById('popup-slider');
+        const popup = document.getElementById('value-slider-popup');
+        const shapeControls = document.getElementById('shape-controls');
+        const btnPopulate = document.getElementById('btn-populate');
+        const populateOptions = document.getElementById('populate-options');
+        const shapeModeLabel = document.getElementById('shape-mode-label');
+
+        // Helpers
+        const tintCanvas = document.createElement('canvas');
+        const tintCtx = tintCanvas.getContext('2d', { willReadFrequently: true });
+        const idCanvas = document.createElement('canvas');
+        const idCtx = idCanvas.getContext('2d', { willReadFrequently: true });
+        const shapeCanvas = document.createElement('canvas');
+        const shapeCtx = shapeCanvas.getContext('2d', { willReadFrequently: true });
+        const lockedShapeCanvas = document.createElement('canvas');
+        const lockedShapeCtx = lockedShapeCanvas.getContext('2d', { willReadFrequently: true });
+
+        // --- Initialization ---
+        function init() {
+            resizeCanvases();
+            window.addEventListener('resize', resizeCanvases);
+            addStudio(true); 
+            initExperimental();
+
+            // Events
+            mainCanvas.addEventListener('mousedown', startMainDraw);
+            mainCanvas.addEventListener('mousemove', drawMain);
+            window.addEventListener('mouseup', stopMainDraw);
+            mainCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); startMainDraw(e.touches[0]); }, { passive: false });
+            mainCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); drawMain(e.touches[0]); }, { passive: false });
+            window.addEventListener('touchend', stopMainDraw);
+
+            // Controls
+            sizeSlider.addEventListener('input', (e) => { state.mainBrushSize = parseInt(e.target.value); sizeDisplay.textContent = state.mainBrushSize; setActiveSidebar('left'); });
+            studioSizeSlider.addEventListener('input', (e) => { state.studioBrushSize = parseInt(e.target.value); studioSizeDisplay.textContent = state.studioBrushSize; setActiveSidebar('left'); });
+            spacingSlider.addEventListener('input', (e) => { state.brushSpacing = parseInt(e.target.value); spacingDisplay.textContent = state.brushSpacing; setActiveSidebar('left'); });
+            flowSlider.addEventListener('input', (e) => { state.flowRate = parseFloat(e.target.value); flowDisplay.textContent = state.flowRate; setActiveSidebar('left'); });
+            jitterSlider.addEventListener('input', (e) => { state.rotationJitter = parseInt(e.target.value); jitterDisplay.textContent = state.rotationJitter; setActiveSidebar('left'); });
+            pivotXSlider.addEventListener('input', (e) => { state.pivotX = parseInt(e.target.value) / 100; pivotXDisplay.textContent = parseInt(e.target.value); setActiveSidebar('left'); });
+            pivotYSlider.addEventListener('input', (e) => { state.pivotY = parseInt(e.target.value) / 100; pivotYDisplay.textContent = parseInt(e.target.value); setActiveSidebar('left'); });
+
+            // Experimental Controls
+            expScatterSlider.addEventListener('input', (e) => { state.expScatter = parseInt(e.target.value); expScatterDisplay.textContent = state.expScatter; setActiveSidebar('right'); });
+            expRotateSlider.addEventListener('input', (e) => { state.expRotate = parseInt(e.target.value); expRotateDisplay.textContent = state.expRotate; setActiveSidebar('right'); });
+            
+            expVariationSlider.addEventListener('input', (e) => { 
+                state.expVariation = parseInt(e.target.value); 
+                expVarDisplay.textContent = state.expVariation; 
+                setActiveSidebar('right');
+                // Force update active chance immediately if not fluxing, otherwise wait for next stamp
+                if(!state.expFlux) state.activeVariationChance = state.expVariation;
+            });
+            
+            expFluxCheckbox.addEventListener('change', (e) => {
+                state.expFlux = e.target.checked;
+                // If turned off, reset immediately
+                if (!state.expFlux) state.activeVariationChance = state.expVariation;
+            });
+
+            window.addEventListener('keydown', (e) => { if (['1', '2', '3'].includes(e.key)) selectValue(parseInt(e.key)); });
+
+            popupSlider.addEventListener('input', (e) => {
+                if (state.editingValueIndex !== null) {
+                    let newVal = parseInt(e.target.value);
+                    const idx = state.editingValueIndex;
+                    const buffer = 8; 
+                    if (idx === 1 && newVal > state.values[2] - buffer) newVal = state.values[2] - buffer;
+                    if (idx === 2) {
+                        if (newVal < state.values[1] + buffer) newVal = state.values[1] + buffer;
+                        if (newVal > state.values[3] - buffer) newVal = state.values[3] - buffer;
+                    }
+                    if (idx === 3 && newVal < state.values[2] + buffer) newVal = state.values[2] + buffer;
+                    if (parseInt(e.target.value) !== newVal) e.target.value = newVal;
+                    
+                    if (idx === 0) updateBackground(newVal);
+                    else updateValue(idx, newVal);
+                }
+            });
+            popupSlider.addEventListener('change', () => saveState());
+
+            updateSwatchUI();
+            saveState(); 
+        }
+
+        function setActiveSidebar(side) {
+            state.brushSource = side === 'left' ? 'standard' : 'experimental';
+            if (side === 'left') {
+                sidebarLeft.classList.add('sidebar-active');
+                sidebarLeft.classList.remove('border-transparent');
+                sidebarRight.classList.remove('sidebar-active');
+                sidebarRight.classList.add('border-transparent');
+            } else {
+                sidebarRight.classList.add('sidebar-active');
+                sidebarRight.classList.remove('border-transparent');
+                sidebarLeft.classList.remove('sidebar-active');
+                sidebarLeft.classList.add('border-transparent');
+            }
+        }
+
+        // --- Experimental Studio Logic ---
+        function initExperimental() {
+            // Setup canvas
+            expCanvas.width = 150;
+            expCanvas.height = 150;
+
+            let isDrawing = false;
+            let currentStrokeCanvas = null;
+            let currentStrokeCtx = null;
+
+            function getPos(e) {
+                const rect = expCanvas.getBoundingClientRect();
+                const scaleX = expCanvas.width / rect.width;
+                const scaleY = expCanvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+            }
+
+            function drawDot(ctx, x, y) {
+                ctx.lineWidth = state.studioBrushSize;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = 'black';
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            }
+
+            expCanvas.addEventListener('mousedown', (e) => {
+                if (state.expStrokes.length >= 10) return;
+                setActiveSidebar('right');
+                isDrawing = true;
+                
+                // Create new stroke layer
+                const sCanvas = document.createElement('canvas');
+                sCanvas.width = 150; sCanvas.height = 150;
+                const sCtx = sCanvas.getContext('2d');
+                state.expStrokes.push(sCanvas);
+                currentStrokeCanvas = sCanvas;
+                currentStrokeCtx = sCtx;
+                
+                // Start path on the stroke canvas
+                currentStrokeCtx.beginPath();
+                const pos = getPos(e);
+                drawDot(currentStrokeCtx, pos.x, pos.y);
+                
+                // Update Visual
+                renderExpVisual();
+                updateExpUI();
+            });
+
+            expCanvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                drawDot(currentStrokeCtx, pos.x, pos.y);
+                renderExpVisual();
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDrawing) {
+                    isDrawing = false;
+                    currentStrokeCtx.beginPath();
+                }
+            });
+        }
+
+        function renderExpVisual() {
+            // Clear main view
+            expCtx.clearRect(0, 0, 150, 150);
+            // Draw all stroke layers
+            state.expStrokes.forEach(layer => {
+                expCtx.drawImage(layer, 0, 0);
+            });
+        }
+
+        function updateExpUI() {
+            const count = state.expStrokes.length;
+            expStrokeCount.textContent = `${count}/10`;
+            if (count > 0) {
+                expHint.style.opacity = '0';
+            } else {
+                expHint.style.opacity = '1';
+            }
+        }
+
+        function clearExperimental() {
+            state.expStrokes = [];
+            expCtx.clearRect(0, 0, 150, 150);
+            updateExpUI();
+            setActiveSidebar('right'); 
+        }
+
+        function setExpMode(mode) {
+            state.expMode = mode;
+            if (mode === 'composite') {
+                modeCompositeBtn.className = "flex-1 py-1 text-[10px] font-bold rounded bg-white shadow text-purple-700 transition";
+                modeVariationBtn.className = "flex-1 py-1 text-[10px] font-bold rounded text-gray-500 hover:bg-gray-100 transition";
+                modeDesc.textContent = "Stamps all strokes together as one.";
+                variationControls.classList.add('hidden');
+            } else {
+                modeCompositeBtn.className = "flex-1 py-1 text-[10px] font-bold rounded text-gray-500 hover:bg-gray-100 transition";
+                modeVariationBtn.className = "flex-1 py-1 text-[10px] font-bold rounded bg-white shadow text-purple-700 transition";
+                modeDesc.textContent = "Randomly swaps Main stroke (1st) with variations.";
+                variationControls.classList.remove('hidden');
+            }
+            setActiveSidebar('right');
+        }
+
+
+        // --- Canvas Resizing ---
+        function resizeCanvases() {
+            const rect = canvasWrapper.getBoundingClientRect();
+            const tempMain = document.createElement('canvas');
+            const tempId = document.createElement('canvas');
+            const tempLocked = document.createElement('canvas'); 
+
+            tempMain.width = mainCanvas.width; tempMain.height = mainCanvas.height;
+            tempId.width = idCanvas.width; tempId.height = idCanvas.height;
+            tempLocked.width = lockedShapeCanvas.width; tempLocked.height = lockedShapeCanvas.height;
+
+            if(mainCanvas.width > 0) {
+                tempMain.getContext('2d').drawImage(mainCanvas, 0, 0);
+                tempId.getContext('2d').drawImage(idCanvas, 0, 0);
+                tempLocked.getContext('2d').drawImage(lockedShapeCanvas, 0, 0);
+            }
+            mainCanvas.width = rect.width; mainCanvas.height = rect.height;
+            idCanvas.width = rect.width; idCanvas.height = rect.height;
+            shapeCanvas.width = rect.width; shapeCanvas.height = rect.height;
+            lockedShapeCanvas.width = rect.width; lockedShapeCanvas.height = rect.height;
+            
+            if (tempMain.width > 0) {
+                 mainCtx.drawImage(tempMain, 0, 0);
+                 idCtx.drawImage(tempId, 0, 0);
+                 lockedShapeCtx.drawImage(tempLocked, 0, 0);
+            } else {
+                const bg = state.backgroundValue;
+                mainCtx.fillStyle = `rgb(${bg},${bg},${bg})`;
+                mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+                idCtx.clearRect(0, 0, idCanvas.width, idCanvas.height);
+                lockedShapeCtx.clearRect(0, 0, lockedShapeCanvas.width, lockedShapeCanvas.height);
+            }
+        }
+
+        // --- Drawing Logic ---
+        let lastPos = { x: 0, y: 0 };
+
+        function getMainPos(e) {
+            const clientX = e.clientX || e.touches?.[0]?.clientX;
+            const clientY = e.clientY || e.touches?.[0]?.clientY;
+            const rect = mainCanvas.getBoundingClientRect();
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function startMainDraw(e) {
+            if (state.tool === 'shape') {
+                if (state.shapeModeStep !== 'none') return; 
+                state.isDrawingMain = true;
+                state.shapePath = [];
+                state.shapeModeStep = 'drawing';
+                const pos = getMainPos(e);
+                state.shapePath.push(pos);
+            } else {
+                state.isDrawingMain = true;
+                lastPos = getMainPos(e);
+                drawStamp(lastPos.x, lastPos.y);
+                if (state.flowRate > 0) {
+                    clearInterval(state.flowInterval);
+                    const intervalTime = 1000 / state.flowRate;
+                    state.flowInterval = setInterval(() => { if (state.isDrawingMain) drawStamp(lastPos.x, lastPos.y); }, intervalTime);
+                }
+            }
+        }
+
+        function drawMain(e) {
+            if (!state.isDrawingMain) return;
+            const currentPos = getMainPos(e);
+            
+            if (state.tool === 'shape') {
+                state.shapePath.push(currentPos);
+                mainCtx.lineWidth = 2;
+                mainCtx.strokeStyle = '#9333ea'; 
+                mainCtx.setLineDash([5, 5]);
+                mainCtx.beginPath();
+                const len = state.shapePath.length;
+                if (len > 1) {
+                    mainCtx.moveTo(state.shapePath[len-2].x, state.shapePath[len-2].y);
+                    mainCtx.lineTo(currentPos.x, currentPos.y);
+                    mainCtx.stroke();
+                }
+            } else {
+                if (state.flowRate > 0) { lastPos = currentPos; return; }
+                const dist = Math.hypot(currentPos.x - lastPos.x, currentPos.y - lastPos.y);
+                const step = Math.max(1, state.mainBrushSize * (state.brushSpacing / 100));
+                for (let i = 0; i < dist; i += step) {
+                    const cx = lastPos.x + (currentPos.x - lastPos.x) * (i / dist);
+                    const cy = lastPos.y + (currentPos.y - lastPos.y) * (i / dist);
+                    drawStamp(cx, cy);
+                }
+                lastPos = currentPos;
+            }
+        }
+
+        function stopMainDraw() {
+            if (state.isDrawingMain) {
+                state.isDrawingMain = false;
+                clearInterval(state.flowInterval);
+
+                if (state.tool === 'shape') {
+                    if (state.shapePath.length > 2) {
+                        mainCtx.lineTo(state.shapePath[0].x, state.shapePath[0].y);
+                        mainCtx.stroke();
+                        mainCtx.setLineDash([]);
+                        state.shapeModeStep = 'ready';
+                        shapeControls.classList.remove('hidden');
+                        btnPopulate.classList.remove('hidden');
+                        populateOptions.classList.add('hidden');
+                    } else {
+                        state.shapeModeStep = 'none'; 
+                    }
+                } else {
+                    saveState();
+                }
+            }
+        }
+
+        // --- FLUX LOGIC ---
+        function updateFlux() {
+            if (!state.expFlux) {
+                state.activeVariationChance = state.expVariation;
+                return;
+            }
+
+            state.fluxCounter++;
+            if (state.fluxCounter >= state.fluxLimit) {
+                state.fluxCounter = 0;
+                // New duration: Random between 5 and 25 stamps
+                state.fluxLimit = Math.floor(Math.random() * 20) + 5;
+                // New chance: Random between 0 and 2x the base slider value (clamped at 100)
+                // This allows the brush to "drift" into being very random or very consistent
+                state.activeVariationChance = Math.random() * Math.min(100, state.expVariation * 2);
+            }
+        }
+
+        // --- STAMP DRAWING LOGIC (Merged) ---
+
+        function drawStamp(x, y) {
+            updateFlux(); // Update the dynamic chance on every stamp
+
+            const size = state.mainBrushSize;
+            const activeGrayVal = state.values[state.activeValueIndex];
+            const activeColor = `rgb(${activeGrayVal}, ${activeGrayVal}, ${activeGrayVal})`;
+            const idColor = state.activeValueIndex === 1 ? 'rgb(255,0,0)' : state.activeValueIndex === 2 ? 'rgb(0,255,0)' : 'rgb(0,0,255)';
+
+            // --- SOURCE SELECTION ---
+            let sourceCanvases = []; 
+
+            if (state.brushSource === 'experimental' && state.expStrokes.length > 0) {
+                // EXPERIMENTAL MODE
+                if (state.expMode === 'composite') {
+                    // Stack All Strokes
+                    sourceCanvases = state.expStrokes.map(c => ({
+                        canvas: c,
+                        dX: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dY: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dRot: (Math.random() - 0.5) * 2 * (state.expRotate * Math.PI / 180)
+                    }));
+                } else {
+                    // Variation Mode (Pick One)
+                    let selectedIndex = 0; // Default to Main (1st) stroke
+                    // Use activeVariationChance (which might be fluxing) instead of static expVariation
+                    if (state.expStrokes.length > 1 && Math.random() * 100 < state.activeVariationChance) {
+                        // Pick a random variation from the rest
+                        selectedIndex = 1 + Math.floor(Math.random() * (state.expStrokes.length - 1));
+                    }
+                    
+                    sourceCanvases.push({
+                        canvas: state.expStrokes[selectedIndex],
+                        // In single mode, scatter/rotate applies to the whole stamp relative to mouse
+                        dX: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dY: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dRot: (Math.random() - 0.5) * 2 * (state.expRotate * Math.PI / 180)
+                    });
+                }
+            } else {
+                // STANDARD MODE (or fallback)
+                const allEmpty = state.studios.every(s => s.isEmpty);
+                let sc = null;
+                if ((allEmpty && state.brushSource === 'standard') || (state.brushSource === 'experimental' && state.expStrokes.length === 0)) {
+                    if (tintCanvas.width !== size || tintCanvas.height !== size) { tintCanvas.width = size; tintCanvas.height = size; }
+                    tintCtx.clearRect(0,0,size,size); tintCtx.beginPath(); tintCtx.arc(size/2, size/2, size/2, 0, Math.PI*2); tintCtx.fillStyle = 'black'; tintCtx.fill();
+                    sc = tintCanvas;
+                } else if (state.brushSource === 'standard') {
+                    const studio = pickRandomStudio();
+                    if(studio) sc = studio.canvas;
+                }
+                
+                if (sc) sourceCanvases.push({ canvas: sc, dX: 0, dY: 0, dRot: 0 });
+            }
+
+            if (sourceCanvases.length === 0) return;
+
+            // Global Transformations (applied to group)
+            const globalRot = (Math.random() - 0.5) * 2 * (state.rotationJitter * Math.PI / 180);
+            const pX = state.pivotX * size;
+            const pY = state.pivotY * size;
+
+            // Render Function
+            const renderTo = (ctx, mode) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(globalRot); 
+                
+                sourceCanvases.forEach(comp => {
+                    ctx.save();
+                    const scale = size / 40;
+                    ctx.translate(comp.dX * scale, comp.dY * scale);
+                    ctx.rotate(comp.dRot); 
+                    
+                    if (mode === 'erase') {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.drawImage(comp.canvas, -pX, -pY, size, size);
+                    } else if (mode === 'color') {
+                        if (tintCanvas.width !== size || tintCanvas.height !== size) { tintCanvas.width = size; tintCanvas.height = size; }
+                        tintCtx.globalCompositeOperation = 'source-over';
+                        tintCtx.clearRect(0,0,size,size);
+                        tintCtx.drawImage(comp.canvas, 0, 0, size, size);
+                        tintCtx.globalCompositeOperation = 'source-in';
+                        tintCtx.fillStyle = activeColor;
+                        tintCtx.fillRect(0,0,size,size);
+                        
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.drawImage(tintCanvas, -pX, -pY);
+                    } else if (mode === 'id') {
+                        if (tintCanvas.width !== size || tintCanvas.height !== size) { tintCanvas.width = size; tintCanvas.height = size; }
+                        tintCtx.globalCompositeOperation = 'source-over';
+                        tintCtx.clearRect(0,0,size,size);
+                        tintCtx.drawImage(comp.canvas, 0, 0, size, size);
+                        tintCtx.globalCompositeOperation = 'source-in';
+                        tintCtx.fillStyle = idColor;
+                        tintCtx.fillRect(0,0,size,size);
+                        
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.drawImage(tintCanvas, -pX, -pY);
+                    }
+                    ctx.restore();
+                });
+                ctx.restore();
+            };
+
+            if (state.tool === 'eraser') {
+                renderTo(mainCtx, 'erase');
+                renderTo(idCtx, 'erase');
+            } else {
+                renderTo(mainCtx, 'color');
+                renderTo(idCtx, 'id');
+            }
+        }
+
+        // --- SHAPE FILL LOGIC (Updated to use drawStampToContext which needs update) ---
+
+        function drawStampToContext(ctx, x, y, visual = true) {
+            const size = state.mainBrushSize; 
+            const varySize = size * (0.8 + Math.random() * 0.4);
+            const activeGrayVal = state.values[state.activeValueIndex];
+            const activeColor = `rgb(${activeGrayVal}, ${activeGrayVal}, ${activeGrayVal})`;
+
+            // --- SOURCE SELECTION ---
+            let sourceCanvases = []; 
+            if (state.brushSource === 'experimental' && state.expStrokes.length > 0) {
+                 if (state.expMode === 'composite') {
+                    sourceCanvases = state.expStrokes.map(c => ({
+                        canvas: c,
+                        dX: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dY: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dRot: (Math.random() - 0.5) * 2 * (state.expRotate * Math.PI / 180)
+                    }));
+                 } else {
+                    let selectedIndex = 0; 
+                    // USE ACTIVE CHANCE (Fluxed)
+                    if (state.expStrokes.length > 1 && Math.random() * 100 < state.activeVariationChance) {
+                        selectedIndex = 1 + Math.floor(Math.random() * (state.expStrokes.length - 1));
+                    }
+                    sourceCanvases.push({
+                        canvas: state.expStrokes[selectedIndex],
+                        dX: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dY: (Math.random() - 0.5) * 2 * state.expScatter,
+                        dRot: (Math.random() - 0.5) * 2 * (state.expRotate * Math.PI / 180)
+                    });
+                 }
+            } else {
+                const allEmpty = state.studios.every(s => s.isEmpty);
+                let sc = null;
+                if ((allEmpty && state.brushSource === 'standard') || (state.brushSource === 'experimental' && state.expStrokes.length === 0)) {
+                    if (tintCanvas.width !== varySize || tintCanvas.height !== varySize) { tintCanvas.width = varySize; tintCanvas.height = varySize; }
+                    const tCtx = tintCanvas.getContext('2d');
+                    tCtx.clearRect(0,0,varySize,varySize); tCtx.beginPath(); tCtx.arc(varySize/2, varySize/2, varySize/2, 0, Math.PI*2); tCtx.fillStyle = 'black'; tCtx.fill();
+                    sc = tintCanvas;
+                } else {
+                    const studio = pickRandomStudio();
+                    if(studio) sc = studio.canvas;
+                }
+                if(sc) sourceCanvases.push({ canvas: sc, dX: 0, dY: 0, dRot: 0 });
+            }
+
+            if (sourceCanvases.length === 0) return;
+
+            const globalRot = (Math.random() - 0.5) * 2 * (state.rotationJitter * Math.PI / 180);
+            const pX = state.pivotX * varySize;
+            const pY = state.pivotY * varySize;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(globalRot);
+
+            sourceCanvases.forEach(comp => {
+                ctx.save();
+                const scale = varySize / 40;
+                ctx.translate(comp.dX * scale, comp.dY * scale);
+                ctx.rotate(comp.dRot);
+
+                if (visual) {
+                     // Tint using temp canvas
+                     const sCanvas = document.createElement('canvas');
+                     sCanvas.width = varySize; sCanvas.height = varySize;
+                     const sCtx = sCanvas.getContext('2d');
+                     sCtx.drawImage(comp.canvas, 0, 0, varySize, varySize);
+                     sCtx.globalCompositeOperation = 'source-in';
+                     sCtx.fillStyle = activeColor;
+                     sCtx.fillRect(0, 0, varySize, varySize);
+                     ctx.drawImage(sCanvas, -pX, -pY);
+                } else {
+                     ctx.drawImage(comp.canvas, -pX, -pY, varySize, varySize);
+                }
+                ctx.restore();
+            });
+            ctx.restore();
+        }
+
+        // ... rest of functions ...
+        function nextShapeMode() {
+            state.fillAlgorithm = (state.fillAlgorithm + 1) % state.fillAlgorithms.length;
+            shapeModeLabel.textContent = state.fillAlgorithms[state.fillAlgorithm];
+            populateShape(false);
+        }
+
+        function populateShape(lockPrevious = false) {
+            state.shapeModeStep = 'populated';
+            btnPopulate.classList.add('hidden');
+            populateOptions.classList.remove('hidden');
+
+            if (lockPrevious) {
+                lockedShapeCtx.drawImage(shapeCanvas, 0, 0);
+            } 
+            
+            shapeCtx.clearRect(0, 0, shapeCanvas.width, shapeCanvas.height);
+            
+            const bounds = getBounds(state.shapePath);
+            const points = generatePoints(bounds);
+
+            // Reset flux counter at start of populate
+            state.fluxCounter = state.fluxLimit; 
+
+            points.forEach(pt => {
+                 if (isPointInPoly(pt, state.shapePath)) {
+                     updateFlux(); // Update flux chance for each point
+                     drawStampToContext(shapeCtx, pt.x, pt.y, true);
+                 }
+            });
+
+            const lastFrame = state.history[state.historyStep];
+            if (lastFrame) {
+                const img = new Image();
+                img.onload = () => {
+                    mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                    mainCtx.drawImage(img, 0, 0);
+                    mainCtx.drawImage(lockedShapeCanvas, 0, 0);
+                    mainCtx.drawImage(shapeCanvas, 0, 0); 
+                    
+                    mainCtx.strokeStyle = '#9333ea';
+                    mainCtx.setLineDash([5, 5]);
+                    mainCtx.lineWidth = 1;
+                    mainCtx.beginPath();
+                    state.shapePath.forEach((p, i) => { if(i===0) mainCtx.moveTo(p.x, p.y); else mainCtx.lineTo(p.x, p.y); });
+                    mainCtx.closePath();
+                    mainCtx.stroke();
+                };
+                img.src = lastFrame.main; 
+            }
+        }
+
+        function confirmShape() {
+            const lastFrame = state.history[state.historyStep];
+            const imgMain = new Image();
+            imgMain.onload = () => {
+                mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                mainCtx.drawImage(imgMain, 0, 0);
+                mainCtx.drawImage(lockedShapeCanvas, 0, 0);
+                mainCtx.drawImage(shapeCanvas, 0, 0);
+                
+                tintCtx.clearRect(0, 0, tintCanvas.width, tintCanvas.height);
+                tintCanvas.width = mainCanvas.width;
+                tintCanvas.height = mainCanvas.height;
+                
+                tintCtx.drawImage(lockedShapeCanvas, 0, 0);
+                tintCtx.drawImage(shapeCanvas, 0, 0);
+                
+                const idColor = state.activeValueIndex === 1 ? 'rgb(255,0,0)' : state.activeValueIndex === 2 ? 'rgb(0,255,0)' : 'rgb(0,0,255)';
+                tintCtx.globalCompositeOperation = 'source-in';
+                tintCtx.fillStyle = idColor;
+                tintCtx.fillRect(0, 0, tintCanvas.width, tintCanvas.height);
+                
+                idCtx.globalCompositeOperation = 'source-over';
+                idCtx.drawImage(tintCanvas, 0, 0);
+                
+                cancelShape(false); 
+                saveState(); 
+            };
+            imgMain.src = lastFrame.main;
+        }
+
+        function cancelShape(revert = true) {
+            shapeControls.classList.add('hidden');
+            state.shapeModeStep = 'none';
+            state.shapePath = [];
+            lockedShapeCtx.clearRect(0, 0, lockedShapeCanvas.width, lockedShapeCanvas.height);
+            
+            if (revert) {
+                undo(); 
+                state.historyStep++; 
+                const frame = state.history[state.historyStep];
+                const img = new Image();
+                img.onload = () => {
+                    mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+                    mainCtx.drawImage(img, 0, 0);
+                };
+                img.src = frame.main;
+            }
+        }
+
+        function getBounds(poly) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            poly.forEach(p => {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            });
+            return { minX, minY, maxX, maxY, width: maxX-minX, height: maxY-minY };
+        }
+
+        function isPointInPoly(pt, poly) {
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const xi = poly[i].x, yi = poly[i].y;
+                const xj = poly[j].x, yj = poly[j].y;
+                const intersect = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function generatePoints(bounds) {
+            const points = [];
+            const algo = state.fillAlgorithms[state.fillAlgorithm];
+            const density = 200 / state.mainBrushSize; 
+            const count = (bounds.width * bounds.height) / (state.mainBrushSize * state.mainBrushSize) * 2;
+            
+            if (algo === 'Clusters') {
+                const numSeeds = Math.max(3, count / 20);
+                const seeds = [];
+                for(let i=0; i<numSeeds; i++) {
+                    seeds.push({
+                        x: bounds.minX + Math.random() * bounds.width,
+                        y: bounds.minY + Math.random() * bounds.height
+                    });
+                }
+                for (let i=0; i<count; i++) {
+                    const seed = seeds[Math.floor(Math.random() * seeds.length)];
+                    const r = (Math.random() + Math.random()) * state.mainBrushSize * 2; 
+                    const theta = Math.random() * Math.PI * 2;
+                    points.push({
+                        x: seed.x + r * Math.cos(theta),
+                        y: seed.y + r * Math.sin(theta)
+                    });
+                }
+            } else if (algo === 'Golden Spiral') {
+                const cx = bounds.minX + bounds.width/2;
+                const cy = bounds.minY + bounds.height/2;
+                const scale = state.mainBrushSize * 0.8;
+                const rotationOffset = Math.random() * Math.PI * 2; 
+                
+                for (let i=0; i<count * 3; i++) {
+                    if (Math.random() > 0.7) continue;
+                    const r = scale * Math.sqrt(i);
+                    const theta = i * 2.39996 + rotationOffset; 
+                    points.push({
+                        x: cx + r * Math.cos(theta),
+                        y: cy + r * Math.sin(theta)
+                    });
+                }
+            } else if (algo === 'Veins') {
+                for (let i=0; i<count * 2; i++) {
+                    const x = bounds.minX + Math.random() * bounds.width;
+                    const y = bounds.minY + Math.random() * bounds.height;
+                    const scale = 0.02;
+                    const n = Math.sin(x * scale) + Math.sin(y * scale * 1.5) + Math.sin((x+y)*scale*0.5);
+                    if (Math.abs(n) < 0.5) {
+                         points.push({x, y});
+                    }
+                }
+            }
+            return points;
+        }
+
+        function pickRandomStudio() {
+            const totalWeight = state.studios.reduce((sum, s) => sum + s.weight, 0);
+            if (totalWeight === 0) return state.studios[0]; 
+            let random = Math.random() * totalWeight;
+            for (const studio of state.studios) {
+                if (random < studio.weight) return studio;
+                random -= studio.weight;
+            }
+            return state.studios[state.studios.length - 1];
+        }
+
+        // --- Standard Tools ---
+        function setTool(t) {
+            state.tool = t;
+            const btnBrush = document.getElementById('btn-brush');
+            const btnEraser = document.getElementById('btn-eraser');
+            const btnShape = document.getElementById('btn-shape');
+            
+            [btnBrush, btnEraser].forEach(b => b.className = "flex items-center justify-center py-2 px-3 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition");
+            btnShape.className = "col-span-2 flex items-center justify-center py-2 px-3 bg-purple-100 text-purple-700 border border-purple-200 rounded hover:bg-purple-200 transition mt-1";
+
+            if (t === 'brush') {
+                btnBrush.className = "flex items-center justify-center py-2 px-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition active-tool";
+            } else if (t === 'eraser') {
+                btnEraser.className = "flex items-center justify-center py-2 px-3 bg-blue-600 text-white rounded hover:bg-blue-700 transition active-tool";
+            } else if (t === 'shape') {
+                btnShape.className = "col-span-2 flex items-center justify-center py-2 px-3 bg-purple-600 text-white border border-purple-600 rounded hover:bg-purple-700 transition mt-1 shadow-inner";
+            }
+
+            if (t !== 'shape' && state.shapeModeStep !== 'none') {
+                cancelShape();
+            }
+        }
+
+        function saveState() {
+            const frame = {
+                main: mainCanvas.toDataURL(),
+                id: idCanvas.toDataURL(),
+                bg: state.backgroundValue
+            };
+            if (state.historyStep < state.history.length - 1) state.history = state.history.slice(0, state.historyStep + 1);
+            state.history.push(frame);
+            if (state.history.length > 20) state.history.shift();
+            else state.historyStep++;
+        }
+
+        function undo() {
+            if (state.historyStep > 0) {
+                state.historyStep--;
+                const frame = state.history[state.historyStep];
+                if (frame.bg !== undefined) { state.backgroundValue = frame.bg; updateSwatchUI(); }
+                const imgMain = new Image(); const imgId = new Image();
+                let loaded = 0;
+                const done = () => { loaded++; if (loaded === 2) { mainCtx.clearRect(0,0,mainCanvas.width,mainCanvas.height); mainCtx.drawImage(imgMain,0,0); idCtx.clearRect(0,0,idCanvas.width,idCanvas.height); idCtx.drawImage(imgId,0,0); }};
+                imgMain.onload = done; imgId.onload = done;
+                imgMain.src = frame.main; imgId.src = frame.id;
+            }
+        }
+
+        function clearAll() {
+            const bg = state.backgroundValue;
+            mainCtx.fillStyle = `rgb(${bg}, ${bg}, ${bg})`;
+            mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+            idCtx.clearRect(0, 0, idCanvas.width, idCanvas.height);
+            saveState();
+        }
+
+        function updateBackground(newBG) {
+            if (state.backgroundValue === newBG) return;
+            state.backgroundValue = newBG;
+            const imgData = mainCtx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+            const data = imgData.data;
+            const idMap = idCtx.getImageData(0, 0, idCanvas.width, idCanvas.height).data;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = idMap[i]; const g = idMap[i+1]; const b = idMap[i+2]; const idAlpha = idMap[i+3] / 255;
+                let inkVal = 255; 
+                if (r > g && r > b) inkVal = state.values[1];
+                else if (g > r && g > b) inkVal = state.values[2];
+                else if (b > r && b > g) inkVal = state.values[3];
+                const newPixelVal = (1 - idAlpha) * newBG + idAlpha * inkVal;
+                data[i] = newPixelVal; data[i+1] = newPixelVal; data[i+2] = newPixelVal; data[i+3] = 255;
+            }
+            mainCtx.putImageData(imgData, 0, 0);
+            updateSwatchUI();
+        }
+
+        function updateValue(index, newValue) {
+            const oldValue = state.values[index];
+            if (oldValue === newValue) return;
+            state.values[index] = newValue;
+            const bg = state.backgroundValue;
+            const imgData = mainCtx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+            const data = imgData.data;
+            const idMap = idCtx.getImageData(0, 0, idCanvas.width, idCanvas.height).data;
+            for (let i = 0; i < data.length; i += 4) {
+                const r = idMap[i]; const g = idMap[i+1]; const b = idMap[i+2]; const idAlpha = idMap[i+3] / 255; 
+                let isMatch = false;
+                if (index === 1 && r > g && r > b) isMatch = true;
+                if (index === 2 && g > r && g > b) isMatch = true;
+                if (index === 3 && b > r && b > g) isMatch = true;
+                if (isMatch && idAlpha > 0) {
+                    const newPixelVal = (1 - idAlpha) * bg + idAlpha * newValue;
+                    data[i] = newPixelVal; data[i+1] = newPixelVal; data[i+2] = newPixelVal; data[i+3] = 255;
+                }
+            }
+            mainCtx.putImageData(imgData, 0, 0);
+            updateSwatchUI();
+        }
+
+        function selectValue(index) { state.activeValueIndex = index; updateSwatchUI(); closeValueSlider(); }
+        function updateSwatchUI() {
+            const bgEl = document.getElementById('swatch-0'); const bgVal = state.backgroundValue; bgEl.style.backgroundColor = `rgb(${bgVal}, ${bgVal}, ${bgVal})`;
+            if (state.editingValueIndex === 0) bgEl.classList.add('active'); else bgEl.classList.remove('active');
+            for (let i = 1; i <= 3; i++) {
+                const el = document.getElementById(`swatch-${i}`); const val = state.values[i]; el.style.backgroundColor = `rgb(${val}, ${val}, ${val})`;
+                if (i === state.activeValueIndex) el.classList.add('active'); else el.classList.remove('active');
+            }
+        }
+        function openValueSlider(index) {
+            state.editingValueIndex = index; if (index > 0) state.activeValueIndex = index; updateSwatchUI();
+            popup.classList.remove('hidden'); document.getElementById('popup-swatch-id').textContent = index === 0 ? "BG" : `#${index}`;
+            popupSlider.value = index === 0 ? state.backgroundValue : state.values[index];
+        }
+        function closeValueSlider() { popup.classList.add('hidden'); state.editingValueIndex = null; updateSwatchUI(); }
+        function addStudio(isFirst=false) {
+            if (state.studios.length >= state.maxStudios) return;
+            const id = Date.now() + Math.random();
+            const clone = studioTemplate.content.cloneNode(true);
+            const card = clone.querySelector('.studio-card'); const canvas = clone.querySelector('.studio-canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const slider = clone.querySelector('.prob-slider'); const probDisplay = clone.querySelector('.prob-display');
+            const removeBtn = clone.querySelector('.remove-studio-btn'); const clearBtn = clone.querySelector('.clear-studio-btn');
+            const addLinkedBtn = clone.querySelector('.add-linked-btn'); const hint = clone.querySelector('.empty-hint');
+            canvas.width = 150; canvas.height = 150;
+            const studioObj = { id, card, canvas, ctx, slider, probDisplay, weight: 50, isEmpty: true };
+            if (isFirst) { ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(75, 75, 30, 0, Math.PI * 2); ctx.fill(); hint.style.display = 'none'; studioObj.weight = 100; slider.value = 100; studioObj.isEmpty = false; }
+            state.studios.push(studioObj);
+            let isDrawingStudio = false;
+            
+            function drawInStudio(x, y) { 
+                ctx.lineWidth = state.studioBrushSize; 
+                ctx.lineCap = 'round'; 
+                ctx.strokeStyle = 'black'; 
+                ctx.lineTo(x, y); 
+                ctx.stroke(); 
+                ctx.beginPath(); 
+                ctx.moveTo(x, y); 
+                hint.style.display = 'none'; 
+                studioObj.isEmpty = false; 
+                setActiveSidebar('left'); // Drawing in left studio activates left
+            }
+            
+            const getStudioPos = (e, cvs) => { const rect = cvs.getBoundingClientRect(); const scaleX = cvs.width / rect.width; const scaleY = cvs.height / rect.height; return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }; };
+            canvas.addEventListener('mousedown', (e) => { isDrawingStudio = true; ctx.beginPath(); const pos = getStudioPos(e, canvas); drawInStudio(pos.x, pos.y); });
+            canvas.addEventListener('mousemove', (e) => { if (!isDrawingStudio) return; const pos = getStudioPos(e, canvas); drawInStudio(pos.x, pos.y); });
+            window.addEventListener('mouseup', () => { isDrawingStudio = false; ctx.beginPath(); });
+            slider.addEventListener('input', (e) => { studioObj.weight = parseInt(e.target.value); updateProbabilities(); setActiveSidebar('left'); });
+            clearBtn.addEventListener('click', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hint.style.display = 'flex'; studioObj.isEmpty = true; setActiveSidebar('left'); });
+            removeBtn.addEventListener('click', () => { const index = state.studios.findIndex(s => s.id === id); if (index > -1) { state.studios[index].card.remove(); state.studios.splice(index, 1); updateUI(); updateProbabilities(); setActiveSidebar('left'); }});
+            addLinkedBtn.addEventListener('click', () => addStudio());
+            studiosContainer.appendChild(card); updateUI(); updateProbabilities();
+        }
+        function updateUI() {
+            document.getElementById('studio-count').textContent = state.studios.length;
+            state.studios.forEach((s, index) => {
+                s.card.querySelector('.studio-label').textContent = `Studio #${index + 1}`;
+                const removeBtn = s.card.querySelector('.remove-studio-btn'); if (state.studios.length > 1) removeBtn.classList.remove('hidden'); else removeBtn.classList.add('hidden');
+                const addBtn = s.card.querySelector('.add-linked-btn'); if (state.studios.length < state.maxStudios) addBtn.classList.remove('hidden'); else addBtn.classList.add('hidden');
+            });
+            if (state.studios.length >= state.maxStudios) addStudioMainBtn.style.display = 'none'; else addStudioMainBtn.style.display = 'flex';
+        }
+        function updateProbabilities() {
+            const totalWeight = state.studios.reduce((sum, s) => sum + s.weight, 0);
+            state.studios.forEach(s => { let percent = 0; if (totalWeight > 0) percent = Math.round((s.weight / totalWeight) * 100); s.probDisplay.textContent = `${percent}%`; });
+        }
+        init();
+    </script>
+</body>
+</html>
